@@ -44,22 +44,32 @@ function writeLocalLicense(data) {
   fs.writeFileSync(p, JSON.stringify(payload, null, 2), 'utf8');
   return payload;
 }
-async function activateLicense(licenseKey, appVersion = '0.1.0') {
+async function activateLicense(licenseKey, appVersion = '0.1.2') {
   const key = String(licenseKey || '').trim().toUpperCase();
   if (!/^GEEK-[A-Z0-9-]{20,}$/.test(key)) return { success:false, message:'صيغة مفتاح التفعيل غير صحيحة' };
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/activate_license`, {
       method:'POST',
-      headers:{apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json'},
+      headers:{apikey:SUPABASE_KEY, 'Content-Type':'application/json'},
       body:JSON.stringify({p_license_key:key,p_device_hash:machineHash(),p_app_version:appVersion})
     });
-    if (!response.ok) return {success:false,message:'تعذر التحقق من المفتاح. تأكد من الاتصال بالإنترنت وإعداد قاعدة البيانات.'};
-    const result = await response.json();
+    const raw = await response.text();
+    let result = null;
+    try { result = raw ? JSON.parse(raw) : null; } catch (_) {}
+    if (!response.ok) {
+      const detail = result?.message || result?.error_description || result?.error || raw || `HTTP ${response.status}`;
+      return {success:false,message:`تعذر التحقق من المفتاح: ${detail}`};
+    }
     if (!result?.success) return {success:false,message:result?.message || 'مفتاح التفعيل غير صالح'};
-    const payload = writeLocalLicense({license_key:key,activation_token:result.activation_token,device_hash:machineHash(),activated_at:result.activated_at || new Date().toISOString()});
+    const payload = writeLocalLicense({
+      license_key:key,
+      activation_token:result.activation_token,
+      device_hash:machineHash(),
+      activated_at:result.activated_at || new Date().toISOString()
+    });
     return {success:true,license:payload,message:'تم تفعيل Geek POS بنجاح'};
-  } catch (_) {
-    return {success:false,message:'لا يمكن الوصول إلى خادم التفعيل حالياً'};
+  } catch (e) {
+    return {success:false,message:`لا يمكن الوصول إلى خادم التفعيل حالياً: ${e.message || e}`};
   }
 }
 module.exports = { SUPABASE_URL, SUPABASE_KEY, machineHash, readLocalLicense, writeLocalLicense, activateLicense };
