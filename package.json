@@ -60,7 +60,8 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "include": "build/installer.nsh",
-      "artifactName": "Geek-POS-Setup-${version}.${ext}"
+      "artifactName": "Geek-POS-Setup-${version}.${ext}",
+      "warningsAsErrors": false
     }
   }
 }
