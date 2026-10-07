@@ -4,14 +4,14 @@ Var GeekLicenseInput
 Var GeekLicenseStatus
 Var GeekActivationFile
 
+!macro customHeader
+  Page custom GeekLicensePage GeekLicenseLeave
+!macroend
+
 !macro customInit
   InitPluginsDir
   File /oname=$PLUGINSDIR\geek-activate.ps1 "${BUILD_RESOURCES_DIR}\activate.ps1"
   StrCpy $GeekActivationFile "$PLUGINSDIR\geek-license.json"
-!macroend
-
-!macro customPageAfterChangeDir
-  Page custom GeekLicensePage GeekLicenseLeave
 !macroend
 
 Function GeekLicensePage
