@@ -1,0 +1,59 @@
+name: Build Geek POS Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Python for Windows icon
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate JavaScript syntax
+        shell: pwsh
+        run: |
+          node --check src/main/main.js
+          node --check src/main/preload.js
+          node --check src/main/database.js
+          node --check src/main/license.js
+          node --check src/main/secrets.js
+          node --check src/main/sync.js
+          node --check src/renderer/app.js
+
+      - name: Generate Windows icon from Geek POS logo
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python -c "from PIL import Image; im=Image.open(r'build/logo.jpg').convert('RGBA'); im.save(r'build/icon.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows installer
+        run: npm run build:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Geek-POS-Windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30
