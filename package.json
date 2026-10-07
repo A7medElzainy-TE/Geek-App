@@ -1,6 +1,6 @@
 {
   "name": "geek-pos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Geek POS - Arabic offline-first point of sale for Windows",
   "main": "src/main/main.js",
   "author": "Geek POS",
@@ -24,10 +24,31 @@
     "appId": "com.geekpos.desktop",
     "productName": "Geek POS",
     "asar": true,
-    "directories": {"output":"release","buildResources":"build"},
-    "files": ["src/**/*","package.json"],
-    "extraResources": [{"from":"node_modules/sql.js/dist/sql-wasm.wasm","to":"sql-wasm.wasm"}],
-    "win": {"icon":"build/icon.ico","target":[{"target":"nsis","arch":["x64"]}]},
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/sql.js/dist/sql-wasm.wasm",
+        "to": "sql-wasm.wasm"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": true,
