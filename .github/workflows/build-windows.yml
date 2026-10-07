@@ -36,7 +36,7 @@ jobs:
           node --check src/main/license.js
           node --check src/main/secrets.js
           node --check src/main/sync.js
-          node --check src/renderer/app.js
+          Get-ChildItem src/renderer/modules/*.js | ForEach-Object { node --check $_.FullName }
 
       - name: Generate Windows icon from Geek POS logo
         shell: pwsh

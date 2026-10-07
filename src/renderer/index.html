@@ -5,15 +5,22 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Geek POS</title>
-  <link rel="stylesheet" href="../../node_modules/@fontsource/tajawal/400.css">
-  <link rel="stylesheet" href="../../node_modules/@fontsource/tajawal/500.css">
-  <link rel="stylesheet" href="../../node_modules/@fontsource/tajawal/700.css">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="toast" class="toast"></div>
   <div id="modal" class="modal-backdrop hidden"><div id="modalBody" class="modal"></div></div>
   <main id="root"></main>
-  <script src="app.js"></script>
+  <script src="modules/core.js"></script>
+  <script src="modules/sales.js"></script>
+  <script src="modules/delivery-main.js"></script>
+  <script src="modules/delivery-edit.js"></script>
+  <script src="modules/delivery-customers.js"></script>
+  <script src="modules/operations.js"></script>
+  <script src="modules/admin-base.js"></script>
+  <script src="modules/admin-catalog.js"></script>
+  <script src="modules/admin-users.js"></script>
+  <script src="modules/admin-extra.js"></script>
+  <script src="modules/boot.js"></script>
 </body>
 </html>

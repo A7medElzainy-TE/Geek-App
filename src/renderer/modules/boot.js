@@ -1,0 +1,1 @@
+boot().catch(e=>{document.body.innerHTML='<div class="auth-shell"><div class="auth-card"><h1>تعذر تشغيل Geek POS</h1><p>'+esc(e.message)+'</p></div></div>'});
