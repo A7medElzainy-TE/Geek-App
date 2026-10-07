@@ -1,0 +1,45 @@
+{
+  "name": "geek-pos",
+  "version": "0.1.0",
+  "description": "Geek POS - Arabic offline-first point of sale for Windows",
+  "main": "src/main/main.js",
+  "author": "Geek POS",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis --x64",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@fontsource/tajawal": "^5.2.6",
+    "@supabase/supabase-js": "^2.58.0",
+    "sql.js": "^1.13.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.geekpos.desktop",
+    "productName": "Geek POS",
+    "asar": true,
+    "directories": {"output":"release","buildResources":"build"},
+    "files": ["src/**/*","package.json"],
+    "extraResources": [{"from":"node_modules/sql.js/dist/sql-wasm.wasm","to":"sql-wasm.wasm"}],
+    "win": {"icon":"build/icon.ico","target":[{"target":"nsis","arch":["x64"]}]},
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Geek POS",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "include": "build/installer.nsh",
+      "artifactName": "Geek-POS-Setup-${version}.${ext}"
+    }
+  }
+}
