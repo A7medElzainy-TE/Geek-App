@@ -8,7 +8,7 @@ const SyncService = require('./sync');
 const { readLocalLicense, activateLicense, machineHash, SUPABASE_URL, SUPABASE_KEY } = require('./license');
 
 let win, db, secrets, sync;
-const smokeTest=process.argv.includes('--smoke-test');
+const smokeTest=process.env.GEEK_POS_SMOKE_TEST==='1'||process.argv.includes('--smoke-test');
 app.disableHardwareAcceleration();
 
 function startupLogPath(){
@@ -78,8 +78,7 @@ app.whenReady().then(async()=>{
       db.scalar('SELECT COUNT(*) FROM dining_tables');
       db.scalar('SELECT COUNT(*) FROM payment_methods');
       console.log('GEEK_POS_SMOKE_OK');
-      app.exit(0);
-      return;
+      process.exit(0);
     }
 
     createWindow();
@@ -87,6 +86,7 @@ app.whenReady().then(async()=>{
   }catch(err){
     const log=writeStartupLog(err);
     console.error(err);
+    if(smokeTest){process.exit(1)}
     dialog.showErrorBox(
       'Geek POS - تعذر بدء التشغيل',
       `حدث خطأ أثناء تشغيل Geek POS.\n\n${err.message||err}\n\nتم حفظ ملف تشخيص هنا:\n${log}`
