@@ -1,6 +1,6 @@
 {
   "name": "geek-pos",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Geek POS - Arabic offline-first point of sale for Windows",
   "main": "src/main/main.js",
   "author": "Geek POS",

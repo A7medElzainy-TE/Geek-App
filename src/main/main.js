@@ -120,7 +120,7 @@ ipcMain.handle('export:customers',async()=>{
   XLSX.utils.book_append_sheet(wb,ws,'العملاء');
   const {filePath,canceled}=await dialog.showSaveDialog(win,{
     title:'تصدير العملاء',
-    defaultPath:\`عملاء-Geek-POS-\${new Date().toISOString().slice(0,10)}.xlsx\`,
+    defaultPath:`عملاء-Geek-POS-${new Date().toISOString().slice(0,10)}.xlsx`,
     filters:[{name:'Excel',extensions:['xlsx']}]
   });
   if(canceled||!filePath)return{success:false};

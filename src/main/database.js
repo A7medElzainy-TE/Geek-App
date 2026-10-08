@@ -23,7 +23,7 @@ class Database {
   }
 
   migrate() {
-    this.db.run(\`
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT);
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, username TEXT UNIQUE NOT NULL,
@@ -105,15 +105,15 @@ class Database {
       CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
       CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
       CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_id);
-    \`);
+    `);
 
     this.ensureColumn('orders','table_id','TEXT');
     this.seedDefaults();
   }
 
   ensureColumn(table, column, type) {
-    const exists = this.rows(\`PRAGMA table_info(\${table})\`).some(x => x.name === column);
-    if (!exists) this.db.run(\`ALTER TABLE \${table} ADD COLUMN \${column} \${type}\`);
+    const exists = this.rows(`PRAGMA table_info(${table})`).some(x => x.name === column);
+    if (!exists) this.db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
 
   seedDefaults() {
@@ -131,7 +131,7 @@ class Database {
       }
     }
     if (!Number(this.scalar('SELECT COUNT(*) FROM dining_tables'))) {
-      for(let i=1;i<=8;i++) this.run('INSERT INTO dining_tables(id,name,area,seats,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',[this.id(),\`طاولة \${i}\`,'الصالة',4,i,now,now]);
+      for(let i=1;i<=8;i++) this.run('INSERT INTO dining_tables(id,name,area,seats,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',[this.id(),`طاولة ${i}`,'الصالة',4,i,now,now]);
     }
     const s=this.getSettings();
     const defaults={business_name:'',enable_dinein:true,enable_delivery:true,receipt_footer:'شكراً لزيارتكم',invoice_width:'80'};
@@ -174,19 +174,19 @@ class Database {
   getSettings(){const out={};for(const r of this.rows('SELECT key,value FROM settings')){try{out[r.key]=JSON.parse(r.value)}catch{out[r.key]=r.value}}return out}
   setSettings(obj){const now=this.now();for(const[k,v]of Object.entries(obj||{}))this.run('INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at',[k,JSON.stringify(v),now]);this.persist()}
 
-  listCategories(includeInactive=false){return this.rows(\`SELECT * FROM categories \${includeInactive?'':'WHERE active=1'} ORDER BY sort_order,name\`)}
-  listProducts(includeInactive=false){return this.rows(\`SELECT p.*,c.name category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id \${includeInactive?'':'WHERE p.active=1'} ORDER BY c.sort_order,p.name\`)}
+  listCategories(includeInactive=false){return this.rows(`SELECT * FROM categories ${includeInactive?'':'WHERE active=1'} ORDER BY sort_order,name`)}
+  listProducts(includeInactive=false){return this.rows(`SELECT p.*,c.name category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id ${includeInactive?'':'WHERE p.active=1'} ORDER BY c.sort_order,p.name`)}
   upsertCategory(data){
     if(!String(data.name||'').trim())throw new Error('اكتب اسم القسم');
     const id=data.id||this.id(),now=this.now(),old=data.id?this.one('SELECT * FROM categories WHERE id=?',[data.id]):null;
-    this.run('INSERT INTO categories(id,name,sort_order,active,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,sort_order=excluded.sort_order,active=excluded.active,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[id,data.name.trim(),Number(data.sort_order??old?.sort_order??0),data.active===false?0:1,old?.created_at||now,now]);
+    this.run('INSERT INTO categories(id,name,sort_order,active,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,sort_order=excluded.sort_order,active=excluded.active,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,data.name.trim(),Number(data.sort_order??old?.sort_order??0),data.active===false?0:1,old?.created_at||now,now]);
     this.queue('categories',id);this.persist();return id;
   }
   removeCategory(id){this.run("UPDATE categories SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('categories',id);this.persist();return true}
   upsertProduct(data){
     if(!String(data.name||'').trim())throw new Error('اكتب اسم الصنف');
     const id=data.id||this.id(),now=this.now(),old=data.id?this.one('SELECT * FROM products WHERE id=?',[data.id]):null;
-    this.run('INSERT INTO products(id,category_id,sku,barcode,name,price,cost,tax_rate,active,kitchen_printer,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,sku=excluded.sku,barcode=excluded.barcode,name=excluded.name,price=excluded.price,cost=excluded.cost,tax_rate=excluded.tax_rate,active=excluded.active,kitchen_printer=excluded.kitchen_printer,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[id,data.category_id||null,data.sku||'',data.barcode||'',data.name.trim(),Number(data.price||0),Number(data.cost||0),Number(data.tax_rate||0),data.active===false?0:1,data.kitchen_printer||'',old?.created_at||now,now]);
+    this.run('INSERT INTO products(id,category_id,sku,barcode,name,price,cost,tax_rate,active,kitchen_printer,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET category_id=excluded.category_id,sku=excluded.sku,barcode=excluded.barcode,name=excluded.name,price=excluded.price,cost=excluded.cost,tax_rate=excluded.tax_rate,active=excluded.active,kitchen_printer=excluded.kitchen_printer,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,data.category_id||null,data.sku||'',data.barcode||'',data.name.trim(),Number(data.price||0),Number(data.cost||0),Number(data.tax_rate||0),data.active===false?0:1,data.kitchen_printer||'',old?.created_at||now,now]);
     this.queue('products',id);this.persist();return id;
   }
   removeProduct(id){this.run("UPDATE products SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('products',id);this.persist();return true}
@@ -194,19 +194,19 @@ class Database {
   findCustomer(mobile){return this.one('SELECT * FROM customers WHERE mobile=?',[String(mobile||'').trim()])}
   getCustomer(id){const c=this.one('SELECT * FROM customers WHERE id=?',[id]);if(!c)return null;c.addresses=this.rows('SELECT * FROM customer_addresses WHERE customer_id=? ORDER BY is_default DESC,created_at DESC',[id]);return c}
   listCustomers(search=''){
-    const q=\`%\${String(search||'').trim()}%\`;
-    return this.rows(\`SELECT c.*,
+    const q=`%${String(search||'').trim()}%`;
+    return this.rows(`SELECT c.*,
       (SELECT address FROM customer_addresses a WHERE a.customer_id=c.id ORDER BY is_default DESC,created_at DESC LIMIT 1) address,
       (SELECT area FROM customer_addresses a WHERE a.customer_id=c.id ORDER BY is_default DESC,created_at DESC LIMIT 1) area,
       COUNT(o.id) order_count,COALESCE(SUM(CASE WHEN o.status='closed' THEN o.total ELSE 0 END),0) total_spent,MAX(o.created_at) last_order
       FROM customers c LEFT JOIN orders o ON o.customer_id=c.id
       WHERE c.name LIKE ? OR c.mobile LIKE ? OR EXISTS(SELECT 1 FROM customer_addresses a2 WHERE a2.customer_id=c.id AND (a2.address LIKE ? OR a2.area LIKE ?))
-      GROUP BY c.id ORDER BY COALESCE(MAX(o.created_at),c.created_at) DESC LIMIT 500\`,[q,q,q,q]);
+      GROUP BY c.id ORDER BY COALESCE(MAX(o.created_at),c.created_at) DESC LIMIT 500`,[q,q,q,q]);
   }
   saveCustomer(data){
     const mobile=String(data.mobile||'').trim();if(!mobile)throw new Error('رقم الموبايل مطلوب');
     const now=this.now(),existing=this.findCustomer(mobile),id=existing?.id||data.id||this.id();
-    this.run('INSERT INTO customers(id,name,mobile,notes,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,mobile=excluded.mobile,notes=excluded.notes,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[id,String(data.name||'').trim(),mobile,data.notes||'',existing?.created_at||now,now]);
+    this.run('INSERT INTO customers(id,name,mobile,notes,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,mobile=excluded.mobile,notes=excluded.notes,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,String(data.name||'').trim(),mobile,data.notes||'',existing?.created_at||now,now]);
     this.queue('customers',id);
     if(data.address){
       let addressId=data.address_id;
@@ -214,44 +214,44 @@ class Database {
       if(!addressId){const def=this.one('SELECT id FROM customer_addresses WHERE customer_id=? AND is_default=1',[id]);addressId=data.add_new_address?this.id():(def?.id||this.id())}
       if(data.make_default!==false)this.run('UPDATE customer_addresses SET is_default=0 WHERE customer_id=?',[id]);
       const old=this.one('SELECT created_at FROM customer_addresses WHERE id=?',[addressId]);
-      this.run('INSERT INTO customer_addresses(id,customer_id,label,address,area,is_default,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,address=excluded.address,area=excluded.area,is_default=excluded.is_default,notes=excluded.notes,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[addressId,id,data.address_label||'عنوان',data.address,data.area||'',data.make_default===false?0:1,data.address_notes||'',old?.created_at||now,now]);
+      this.run('INSERT INTO customer_addresses(id,customer_id,label,address,area,is_default,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,address=excluded.address,area=excluded.area,is_default=excluded.is_default,notes=excluded.notes,updated_at=excluded.updated_at,sync_status=\'pending\'',[addressId,id,data.address_label||'عنوان',data.address,data.area||'',data.make_default===false?0:1,data.address_notes||'',old?.created_at||now,now]);
       this.queue('customer_addresses',addressId);
     }
     this.persist();return this.getCustomer(id);
   }
 
-  listDrivers(includeInactive=false){return this.rows(\`SELECT * FROM drivers \${includeInactive?'':'WHERE active=1'} ORDER BY name\`)}
-  saveDriver(d){if(!String(d.name||'').trim())throw new Error('اكتب اسم الطيار');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM drivers WHERE id=?',[d.id]):null;this.run('INSERT INTO drivers(id,name,mobile,active,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,mobile=excluded.mobile,active=excluded.active,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[id,d.name.trim(),d.mobile||'',d.active===false?0:1,old?.created_at||now,now]);this.queue('drivers',id);this.persist();return id}
+  listDrivers(includeInactive=false){return this.rows(`SELECT * FROM drivers ${includeInactive?'':'WHERE active=1'} ORDER BY name`)}
+  saveDriver(d){if(!String(d.name||'').trim())throw new Error('اكتب اسم الطيار');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM drivers WHERE id=?',[d.id]):null;this.run('INSERT INTO drivers(id,name,mobile,active,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,mobile=excluded.mobile,active=excluded.active,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,d.name.trim(),d.mobile||'',d.active===false?0:1,old?.created_at||now,now]);this.queue('drivers',id);this.persist();return id}
   removeDriver(id){this.run("UPDATE drivers SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('drivers',id);this.persist();return true}
 
   listDiningTables(includeInactive=false){
-    return this.rows(\`SELECT t.*,
+    return this.rows(`SELECT t.*,
       (SELECT o.id FROM orders o WHERE o.table_id=t.id AND o.order_type='dinein' AND o.status NOT IN ('closed','returned') ORDER BY o.created_at DESC LIMIT 1) open_order_id,
       (SELECT o.order_no FROM orders o WHERE o.table_id=t.id AND o.order_type='dinein' AND o.status NOT IN ('closed','returned') ORDER BY o.created_at DESC LIMIT 1) open_order_no,
       (SELECT o.total FROM orders o WHERE o.table_id=t.id AND o.order_type='dinein' AND o.status NOT IN ('closed','returned') ORDER BY o.created_at DESC LIMIT 1) open_total
-      FROM dining_tables t \${includeInactive?'':'WHERE t.active=1'} ORDER BY t.sort_order,t.name\`);
+      FROM dining_tables t ${includeInactive?'':'WHERE t.active=1'} ORDER BY t.sort_order,t.name`);
   }
-  saveDiningTable(d){if(!String(d.name||'').trim())throw new Error('اكتب اسم الطاولة');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM dining_tables WHERE id=?',[d.id]):null;this.run('INSERT INTO dining_tables(id,name,area,seats,sort_order,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,area=excluded.area,seats=excluded.seats,sort_order=excluded.sort_order,active=excluded.active,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[id,d.name.trim(),d.area||'الصالة',Number(d.seats||4),Number(d.sort_order||0),d.active===false?0:1,old?.created_at||now,now]);this.queue('dining_tables',id);this.persist();return id}
+  saveDiningTable(d){if(!String(d.name||'').trim())throw new Error('اكتب اسم الطاولة');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM dining_tables WHERE id=?',[d.id]):null;this.run('INSERT INTO dining_tables(id,name,area,seats,sort_order,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,area=excluded.area,seats=excluded.seats,sort_order=excluded.sort_order,active=excluded.active,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,d.name.trim(),d.area||'الصالة',Number(d.seats||4),Number(d.sort_order||0),d.active===false?0:1,old?.created_at||now,now]);this.queue('dining_tables',id);this.persist();return id}
   removeDiningTable(id){const occupied=this.one("SELECT id FROM orders WHERE table_id=? AND order_type='dinein' AND status NOT IN ('closed','returned')",[id]);if(occupied)throw new Error('لا يمكن إيقاف طاولة عليها طلب مفتوح');this.run("UPDATE dining_tables SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('dining_tables',id);this.persist();return true}
   currentTableOrder(tableId){const o=this.one("SELECT id FROM orders WHERE table_id=? AND order_type='dinein' AND status NOT IN ('closed','returned') ORDER BY created_at DESC LIMIT 1",[tableId]);return o?this.getOrder(o.id):null}
 
-  listPaymentMethods(includeInactive=false){return this.rows(\`SELECT * FROM payment_methods \${includeInactive?'':'WHERE active=1'} ORDER BY sort_order,name\`)}
-  savePaymentMethod(d){if(!String(d.name||'').trim()||!String(d.code||'').trim())throw new Error('الاسم والكود مطلوبان');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM payment_methods WHERE id=?',[d.id]):null;this.run('INSERT INTO payment_methods(id,name,code,active,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,code=excluded.code,active=excluded.active,sort_order=excluded.sort_order,updated_at=excluded.updated_at,sync_status=\\'pending\\'',[id,d.name.trim(),d.code.trim(),d.active===false?0:1,Number(d.sort_order||0),old?.created_at||now,now]);this.queue('payment_methods',id);this.persist();return id}
+  listPaymentMethods(includeInactive=false){return this.rows(`SELECT * FROM payment_methods ${includeInactive?'':'WHERE active=1'} ORDER BY sort_order,name`)}
+  savePaymentMethod(d){if(!String(d.name||'').trim()||!String(d.code||'').trim())throw new Error('الاسم والكود مطلوبان');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM payment_methods WHERE id=?',[d.id]):null;this.run('INSERT INTO payment_methods(id,name,code,active,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,code=excluded.code,active=excluded.active,sort_order=excluded.sort_order,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,d.name.trim(),d.code.trim(),d.active===false?0:1,Number(d.sort_order||0),old?.created_at||now,now]);this.queue('payment_methods',id);this.persist();return id}
   removePaymentMethod(id){const p=this.one('SELECT code FROM payment_methods WHERE id=?',[id]);if(p?.code==='cash')throw new Error('لا يمكن حذف طريقة الدفع النقدي');this.run("UPDATE payment_methods SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('payment_methods',id);this.persist();return true}
 
   nextOrderNo(){return Number(this.scalar('SELECT COALESCE(MAX(order_no),0)+1 FROM orders'))||1}
   calculate(items,deliveryFee=0,discount=0){const subtotal=(items||[]).reduce((s,i)=>s+Number(i.qty||1)*Number(i.unit_price||0),0),delivery=Number(deliveryFee||0),disc=Number(discount||0);return{subtotal,delivery,discount:disc,total:Math.max(0,subtotal+delivery-disc)}}
   createOrder(data){
     const id=this.id(),now=this.now(),no=this.nextOrderNo(),items=data.items||[],c=this.calculate(items,data.delivery_fee,data.discount);
-    this.run(\`INSERT INTO orders(id,order_no,order_type,customer_id,address_id,driver_id,table_id,shift_id,user_id,status,subtotal,discount,delivery_fee,total,paid,payment_method,notes,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\`,[id,no,data.order_type||'takeaway',data.customer_id||null,data.address_id||null,data.driver_id||null,data.table_id||null,data.shift_id||null,data.user_id||null,data.status||'new',c.subtotal,c.discount,c.delivery,c.total,Number(data.paid||0),data.payment_method||'cash',data.notes||'',now,now]);
+    this.run(`INSERT INTO orders(id,order_no,order_type,customer_id,address_id,driver_id,table_id,shift_id,user_id,status,subtotal,discount,delivery_fee,total,paid,payment_method,notes,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[id,no,data.order_type||'takeaway',data.customer_id||null,data.address_id||null,data.driver_id||null,data.table_id||null,data.shift_id||null,data.user_id||null,data.status||'new',c.subtotal,c.discount,c.delivery,c.total,Number(data.paid||0),data.payment_method||'cash',data.notes||'',now,now]);
     this.replaceOrderItems(id,items,now);
     this.queue('orders',id);this.persist();return this.getOrder(id);
   }
   saveOrder(id,data){
     const old=this.getOrder(id);if(!old)throw new Error('الطلب غير موجود');
     const now=this.now(),items=data.items||old.items,c=this.calculate(items,data.delivery_fee??old.delivery_fee,data.discount??old.discount);
-    this.run(\`UPDATE orders SET customer_id=?,address_id=?,driver_id=?,table_id=?,status=?,subtotal=?,discount=?,delivery_fee=?,total=?,paid=?,payment_method=?,notes=?,updated_at=?,sync_status='pending' WHERE id=?\`,
+    this.run(`UPDATE orders SET customer_id=?,address_id=?,driver_id=?,table_id=?,status=?,subtotal=?,discount=?,delivery_fee=?,total=?,paid=?,payment_method=?,notes=?,updated_at=?,sync_status='pending' WHERE id=?`,
       [data.customer_id??old.customer_id,data.address_id??old.address_id,data.driver_id??old.driver_id,data.table_id??old.table_id,data.status||old.status,c.subtotal,c.discount,c.delivery,c.total,Number(data.paid??old.paid),data.payment_method||old.payment_method,data.notes??old.notes,now,id]);
     if(data.items)this.replaceOrderItems(id,items,now);
     this.queue('orders',id);this.persist();return this.getOrder(id);
@@ -261,13 +261,13 @@ class Database {
     for(const r of old){this.run('DELETE FROM order_items WHERE id=?',[r.id]);this.queue('order_items',r.id,'delete')}
     for(const item of items||[]){const iid=this.id(),qty=Number(item.qty||1),price=Number(item.unit_price||0);this.run('INSERT INTO order_items(id,order_id,product_id,product_name,qty,unit_price,total,notes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',[iid,orderId,item.product_id||null,item.product_name,qty,price,qty*price,item.notes||'',now,now]);this.queue('order_items',iid)}
   }
-  getOrder(id){const o=this.one(\`SELECT o.*,c.name customer_name,c.mobile customer_mobile,d.name driver_name,a.address,a.area,t.name table_name
+  getOrder(id){const o=this.one(`SELECT o.*,c.name customer_name,c.mobile customer_mobile,d.name driver_name,a.address,a.area,t.name table_name
     FROM orders o LEFT JOIN customers c ON c.id=o.customer_id LEFT JOIN drivers d ON d.id=o.driver_id
-    LEFT JOIN customer_addresses a ON a.id=o.address_id LEFT JOIN dining_tables t ON t.id=o.table_id WHERE o.id=?\`,[id]);if(o)o.items=this.rows('SELECT * FROM order_items WHERE order_id=? ORDER BY created_at',[id]);return o}
-  listOrders(type=null){const params=[];let w='1=1';if(type){w='o.order_type=?';params.push(type)}return this.rows(\`SELECT o.*,c.name customer_name,c.mobile customer_mobile,d.name driver_name,a.area,t.name table_name
+    LEFT JOIN customer_addresses a ON a.id=o.address_id LEFT JOIN dining_tables t ON t.id=o.table_id WHERE o.id=?`,[id]);if(o)o.items=this.rows('SELECT * FROM order_items WHERE order_id=? ORDER BY created_at',[id]);return o}
+  listOrders(type=null){const params=[];let w='1=1';if(type){w='o.order_type=?';params.push(type)}return this.rows(`SELECT o.*,c.name customer_name,c.mobile customer_mobile,d.name driver_name,a.area,t.name table_name
     FROM orders o LEFT JOIN customers c ON c.id=o.customer_id LEFT JOIN drivers d ON d.id=o.driver_id
     LEFT JOIN customer_addresses a ON a.id=o.address_id LEFT JOIN dining_tables t ON t.id=o.table_id
-    WHERE \${w} ORDER BY o.created_at DESC LIMIT 500\`,params)}
+    WHERE ${w} ORDER BY o.created_at DESC LIMIT 500`,params)}
   updateOrderStatus(id,status,extra={}){
     const allowed=['new','open','kitchen','ready','with_driver','awaiting_settlement','closed','returned'];if(!allowed.includes(status))throw new Error('حالة غير صحيحة');
     const now=this.now();let sql="UPDATE orders SET status=?,updated_at=?,sync_status='pending'";const p=[status,now];
