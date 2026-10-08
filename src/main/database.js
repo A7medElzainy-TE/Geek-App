@@ -110,10 +110,12 @@ class Database {
       CREATE INDEX IF NOT EXISTS idx_customers_mobile ON customers(mobile);
       CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
       CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
-      CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_id);
     `);
 
+    // Existing installations may have an older orders table without table_id.
+    // Add the column first, then create indexes that depend on it.
     this.ensureColumn('orders','table_id','TEXT');
+    this.run('CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_id)');
     this.seedDefaults();
   }
 
