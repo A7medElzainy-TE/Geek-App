@@ -52,6 +52,10 @@ jobs:
         run: |
           node -e "(async()=>{const fs=require('fs');const path=require('path');const Database=require('./src/main/database');const dir=path.join(process.cwd(),'.geek-smoke');fs.rmSync(dir,{recursive:true,force:true});const db=await new Database(dir).init();const counts=[db.scalar('SELECT COUNT(*) FROM categories'),db.scalar('SELECT COUNT(*) FROM dining_tables'),db.scalar('SELECT COUNT(*) FROM payment_methods')];console.log('GEEK_DB_SMOKE_OK',counts.join(','));fs.rmSync(dir,{recursive:true,force:true});})().catch(e=>{console.error(e);process.exit(1)})"
 
+      - name: Smoke test legacy database migration
+        shell: pwsh
+        run: node scripts/smoke-legacy-db.js
+
       - name: Build Windows installer
         run: npm run build:win
 
