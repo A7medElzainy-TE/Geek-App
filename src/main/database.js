@@ -10,9 +10,15 @@ class Database {
   }
 
   async init() {
-    const wasmPath = process.resourcesPath
-      ? path.join(process.resourcesPath, 'sql-wasm.wasm')
-      : path.join(__dirname, '../../node_modules/sql.js/dist/sql-wasm.wasm');
+    const wasmCandidates = [
+      process.resourcesPath ? path.join(process.resourcesPath, 'sql-wasm.wasm') : null,
+      path.join(__dirname, '../../node_modules/sql.js/dist/sql-wasm.wasm'),
+      path.join(__dirname, '../../../node_modules/sql.js/dist/sql-wasm.wasm')
+    ].filter(Boolean);
+    const wasmPath = wasmCandidates.find(p => fs.existsSync(p));
+    if (!wasmPath) {
+      throw new Error('تعذر العثور على محرك قاعدة البيانات sql-wasm.wasm. المسارات التي تم فحصها: ' + wasmCandidates.join(' | '));
+    }
     const SQL = await initSqlJs({ locateFile: () => wasmPath });
     const bytes = fs.existsSync(this.file) ? fs.readFileSync(this.file) : null;
     this.db = bytes ? new SQL.Database(bytes) : new SQL.Database();
