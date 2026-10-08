@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const XLSX = require('xlsx');
 const Database = require('./database');
 const Secrets = require('./secrets');
@@ -7,17 +8,51 @@ const SyncService = require('./sync');
 const { readLocalLicense, activateLicense, machineHash, SUPABASE_URL, SUPABASE_KEY } = require('./license');
 
 let win, db, secrets, sync;
+const smokeTest=process.argv.includes('--smoke-test');
+app.disableHardwareAcceleration();
+
+function startupLogPath(){
+  try{
+    const root=app.isReady()?app.getPath('userData'):(process.env.TEMP||process.cwd());
+    return path.join(root,'geek-pos-startup.log');
+  }catch(_){return path.join(process.cwd(),'geek-pos-startup.log')}
+}
+function writeStartupLog(error){
+  const text=[
+    'Geek POS startup failure',
+    'Time: '+new Date().toISOString(),
+    'Version: '+app.getVersion(),
+    'Platform: '+process.platform+' '+process.arch,
+    'Packaged: '+app.isPackaged,
+    'Resources: '+process.resourcesPath,
+    '',
+    error?.stack||String(error)
+  ].join('\r\n');
+  try{
+    const p=startupLogPath();
+    fs.mkdirSync(path.dirname(p),{recursive:true});
+    fs.writeFileSync(p,text,'utf8');
+    return p;
+  }catch(_){return ''}
+}
 
 function createWindow(){
   win=new BrowserWindow({
-    width:1500,height:920,minWidth:1180,minHeight:720,show:false,
+    width:1500,height:920,minWidth:1180,minHeight:720,show:true,
     backgroundColor:'#07152f',
     icon:path.join(__dirname,'../renderer/logo.jpg'),
     webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:false}
   });
   win.setMenuBarVisibility(false);
-  win.loadFile(path.join(__dirname,'../renderer/index.html'));
-  win.once('ready-to-show',()=>win.show());
+  const page=path.join(__dirname,'../renderer/index.html');
+  win.loadFile(page).catch(err=>{
+    const log=writeStartupLog(err);
+    dialog.showErrorBox('Geek POS - خطأ تحميل الواجهة',`تعذر تحميل واجهة البرنامج.\n\n${err.message||err}\n\nملف التشخيص: ${log}`);
+  });
+  win.webContents.on('render-process-gone',(_,details)=>{
+    const err=new Error(`Renderer process stopped: ${details.reason} (exit ${details.exitCode})`);
+    writeStartupLog(err);
+  });
 }
 
 async function printHtml(html,printerName){
@@ -33,11 +68,31 @@ async function printHtml(html,printerName){
 }
 
 app.whenReady().then(async()=>{
-  db=await new Database(app.getPath('userData')).init();
-  secrets=new Secrets(app.getPath('userData'));
-  sync=new SyncService(db,secrets);
-  createWindow();
-  setInterval(()=>{if(readLocalLicense())sync.syncNow().catch(()=>{})},120000);
+  try{
+    db=await new Database(app.getPath('userData')).init();
+    secrets=new Secrets(app.getPath('userData'));
+    sync=new SyncService(db,secrets);
+
+    if(smokeTest){
+      db.scalar('SELECT COUNT(*) FROM categories');
+      db.scalar('SELECT COUNT(*) FROM dining_tables');
+      db.scalar('SELECT COUNT(*) FROM payment_methods');
+      console.log('GEEK_POS_SMOKE_OK');
+      app.exit(0);
+      return;
+    }
+
+    createWindow();
+    setInterval(()=>{if(readLocalLicense())sync.syncNow().catch(()=>{})},120000);
+  }catch(err){
+    const log=writeStartupLog(err);
+    console.error(err);
+    dialog.showErrorBox(
+      'Geek POS - تعذر بدء التشغيل',
+      `حدث خطأ أثناء تشغيل Geek POS.\n\n${err.message||err}\n\nتم حفظ ملف تشخيص هنا:\n${log}`
+    );
+    app.exit(1);
+  }
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
 

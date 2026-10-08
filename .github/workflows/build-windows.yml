@@ -47,8 +47,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Smoke test database startup
+        shell: pwsh
+        run: |
+          & ".\node_modules\.bin\electron.cmd" . --smoke-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build Windows installer
         run: npm run build:win
+
+      - name: Smoke test packaged executable
+        shell: pwsh
+        run: |
+          $exe = "release\win-unpacked\Geek POS.exe"
+          if (-not (Test-Path $exe)) { throw "Packaged executable not found: $exe" }
+          $p = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Packaged Geek POS smoke test failed with exit code $($p.ExitCode)" }
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
