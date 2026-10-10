@@ -82,20 +82,22 @@ function orderPrintData(orderId){
   return o;
 }
 function ticketCss(width=80,kind='prep'){
-  if(kind==='receipt')return `<style>@page{size:${Number(width)||80}mm auto;margin:0}*{box-sizing:border-box}body{margin:0;background:#fff;color:#000;font-family:Tahoma,Arial,sans-serif;direction:rtl}.receipt{width:100%;padding:3.2mm 3mm;font-size:10.5px}.r-center{text-align:center}.r-logo{width:36px;height:36px;border-radius:50%;background:#000;color:#fff;display:grid;place-items:center;margin:0 auto 3px;font-size:19px;font-weight:700}.r-name{font-size:14px;font-weight:700;margin:1px 0}.r-small{font-size:9.5px;line-height:1.45}.r-welcome{margin:4px 0 7px}.dash{border-top:1px dashed #555;margin:5px 0}.r-meta{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:9.5px}.r-meta span:nth-child(even){text-align:left}.r-table{width:100%;border-collapse:collapse;margin-top:3px}.r-table th{font-size:9.5px;border-top:1px dashed #555;border-bottom:1px solid #333;padding:3px 0;text-align:right}.r-table th:nth-child(2),.r-table td:nth-child(2){text-align:center;width:36px}.r-table th:last-child,.r-table td:last-child{text-align:left;width:62px}.r-table td{padding:3px 0;vertical-align:top;font-size:10px}.r-note{font-size:8.8px;font-weight:700;padding:0 2px 3px}.r-totals{border-top:1px dashed #555;margin-top:3px;padding-top:3px}.r-total-line{display:flex;justify-content:space-between;padding:1px 0}.r-grand{border-top:1px solid #222;border-bottom:1px dashed #555;margin-top:3px;padding:5px 0;font-size:15px;font-weight:800}.r-paid{display:flex;justify-content:space-between;padding:3px 0 1px}.r-footer{font-size:9px;margin-top:5px}.qr{width:74px;height:74px;display:block;margin:5px auto 0}</style>`;
+  if(kind==='receipt')return `<style>@page{size:${Number(width)||80}mm auto;margin:0}*{box-sizing:border-box}body{margin:0;background:#fff;color:#000;font-family:Tahoma,Arial,sans-serif;direction:rtl}.receipt{width:100%;padding:3.2mm 3mm;font-size:10.5px}.r-center{text-align:center}.r-logo{width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 3px}.r-name{font-size:14px;font-weight:700;margin:1px 0}.r-small{font-size:9.5px;line-height:1.45}.r-welcome{margin:4px 0 7px}.dash{border-top:1px dashed #555;margin:5px 0}.r-meta{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:9.5px}.r-meta span:nth-child(even){text-align:left}.r-table{width:100%;border-collapse:collapse;margin-top:3px}.r-table th{font-size:9.5px;border-top:1px dashed #555;border-bottom:1px solid #333;padding:3px 0;text-align:right}.r-table th:nth-child(2),.r-table td:nth-child(2){text-align:center;width:36px}.r-table th:last-child,.r-table td:last-child{text-align:left;width:62px}.r-table td{padding:3px 0;vertical-align:top;font-size:10px}.r-note{font-size:8.8px;font-weight:700;padding:0 2px 3px}.r-totals{border-top:1px dashed #555;margin-top:3px;padding-top:3px}.r-total-line{display:flex;justify-content:space-between;padding:1px 0}.r-grand{border-top:1px solid #222;border-bottom:1px dashed #555;margin-top:3px;padding:5px 0;font-size:15px;font-weight:800}.r-paid{display:flex;justify-content:space-between;padding:3px 0 1px}.r-footer{font-size:9px;margin-top:5px}.qr{width:74px;height:74px;display:block;margin:5px auto 0}</style>`;
   return `<style>@page{size:${Number(width)||80}mm auto;margin:0}*{box-sizing:border-box}body{margin:0;padding:4mm 3mm;font-family:Tahoma,Arial,sans-serif;color:#000;background:#fff;font-size:12px;direction:rtl}.ticket{width:100%}.center{text-align:center}.title{font-size:20px;font-weight:800;margin:2px 0}.sub{font-size:11px}.line{border-top:1px dashed #000;margin:7px 0}.meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px}.meta b{font-size:13px}.items{width:100%;border-collapse:collapse}.items th,.items td{padding:5px 2px;border-bottom:1px dotted #999;text-align:right}.items th:last-child,.items td:last-child{text-align:left}.qty{font-size:16px;font-weight:800}.item-note{font-size:11px;font-weight:800;margin-top:3px}.note{border:1px solid #000;padding:6px;margin-top:7px;font-weight:700}.route{font-size:13px;font-weight:800;border-bottom:2px solid #000;padding:0 0 6px;margin:0 0 7px;text-align:center}</style>`;
 }
 async function ticketHtml(kind,o,items,width=80,routeName=''){
   const s=db.getSettings(),business=pEsc(s.business_name||'Geek POS');
   const dt=new Date(o.created_at||Date.now()),date=dt.toLocaleDateString('en-GB'),time=dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   if(kind==='receipt'){
+    const logoPath=path.join(__dirname,'../renderer/logo.jpg');
+    const logoData=fs.existsSync(logoPath)?'data:image/jpeg;base64,'+fs.readFileSync(logoPath).toString('base64'):'';
     const qr=await QRCode.toDataURL(`Geek POS | Invoice ${o.order_no} | ${pNum(o.total)} EGP`,{margin:0,width:180,errorCorrectionLevel:'M'});
     const rows=(items||[]).map(i=>`<tr><td>${pEsc(i.product_name)}${i.notes?`<div class="r-note">• ${pEsc(i.notes)}</div>`:''}</td><td>${Number(i.qty)}</td><td>${pNum(i.total||Number(i.qty)*Number(i.unit_price))}</td></tr>`).join('');
     const extra=[];
     if(Number(o.discount||0)>0)extra.push(`<div class="r-total-line"><span>الخصم</span><span>${pMoney(o.discount)}</span></div>`);
     if(Number(o.delivery_fee||0)>0)extra.push(`<div class="r-total-line"><span>التوصيل</span><span>${pMoney(o.delivery_fee)}</span></div>`);
     return `<!doctype html><html dir="rtl"><head><meta charset="utf-8">${ticketCss(width,'receipt')}</head><body><div class="receipt">
-      <div class="r-center"><div class="r-logo">G</div><div class="r-name">${business}</div><div class="r-small">${pEsc(s.business_address||'')}</div><div class="r-small" dir="ltr">${pEsc(s.business_phone||'')}</div><div class="r-welcome">أهلاً بكم</div></div>
+      <div class="r-center">${logoData?`<img class="r-logo" src="${logoData}">`:``}<div class="r-name">${business}</div><div class="r-small">${pEsc(s.business_address||'')}</div><div class="r-small" dir="ltr">${pEsc(s.business_phone||'')}</div><div class="r-welcome">أهلاً بكم</div></div>
       <div class="dash"></div>
       <div class="r-meta"><span>فاتورة #${o.order_no}</span><span>${date} ${time}</span><span>النوع: ${orderTypeAr(o.order_type)}</span><span>${o.table_name?'طاولة: '+pEsc(o.table_name):''}</span><span>الكاشير: ${pEsc(o.cashier_name||'')}</span><span></span></div>
       <table class="r-table"><thead><tr><th>الصنف</th><th>كمية</th><th>القيمة</th></tr></thead><tbody>${rows}</tbody></table>
@@ -118,17 +120,22 @@ function routeMatches(route,o){
 async function routeOrderPrint(orderId,stage='closed'){
   const o=orderPrintData(orderId),routes=db.listPrinterRoutes(false),results=[];
   const jobs=[];
-  if(stage!=='final'){
+  const printPrep=['open','kitchen','closed'].includes(stage);
+  const printAssembly=['kitchen','closed','final'].includes(stage);
+  const printReceipt=['closed','final','receipt'].includes(stage);
+  if(printPrep){
     for(const r of routes.filter(x=>x.route_type==='prep')){
       const its=o.items.filter(i=>i.printer_route_id===r.id);
       if(its.length)jobs.push({r,kind:'prep',items:its});
     }
   }
-  if(stage!=='open'){
+  if(printAssembly){
     for(const r of routes.filter(x=>x.route_type==='assembly'&&routeMatches(x,o))){
       const ids=r.category_ids||[],its=ids.length?o.items.filter(i=>ids.includes(i.category_id)):o.items;
       if(its.length)jobs.push({r,kind:'assembly',items:its});
     }
+  }
+  if(printReceipt){
     for(const r of routes.filter(x=>x.route_type==='receipt'&&routeMatches(x,o))){
       const ids=r.category_ids||[],its=ids.length?o.items.filter(i=>ids.includes(i.category_id)):o.items;
       if(its.length)jobs.push({r,kind:'receipt',items:its});
