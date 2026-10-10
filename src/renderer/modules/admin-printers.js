@@ -21,7 +21,7 @@ async function adminPrinters(){
     <div class="grid grid-3 preview-grid">
       <div class="card"><h3>بون التحضير</h3><button class="btn btn-ghost btn-sm" data-preview="prep">معاينة التصميم</button></div>
       <div class="card"><h3>بون التجميع</h3><button class="btn btn-ghost btn-sm" data-preview="assembly">معاينة التصميم</button></div>
-      <div class="card"><h3>فاتورة العميل</h3><div class="muted">مثال الإجمالي: <b>150 جنيه</b></div><button class="btn btn-ghost btn-sm" data-preview="receipt">معاينة التصميم</button></div>
+      <div class="card"><h3>فاتورة العميل</h3><div class="muted">مثال الإجمالي: <b>150.00 ج.م</b></div><button class="btn btn-ghost btn-sm" data-preview="receipt">معاينة التصميم</button></div>
     </div>`;
 
   const editor=r=>{
