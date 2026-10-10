@@ -59,12 +59,67 @@ async function printHtml(html,printerName){
   const w=new BrowserWindow({show:false,webPreferences:{sandbox:false}});
   await w.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(html));
   const printers=await w.webContents.getPrintersAsync();
-  let deviceName=printerName||'';
-  if(deviceName&&!printers.some(p=>p.name===deviceName))deviceName='';
+  const deviceName=printerName||'';
+  if(deviceName&&!printers.some(p=>p.name===deviceName)){w.close();return{success:false,message:'الطابعة المحددة غير متاحة على Windows'}}
   return new Promise(resolve=>w.webContents.print(
     {silent:Boolean(deviceName),deviceName,printBackground:true,margins:{marginType:'none'}},
     (ok,reason)=>{w.close();resolve({success:ok,message:reason||''})}
   ));
+}
+
+const pEsc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const pMoney=v=>Number(v||0).toLocaleString('ar-EG-u-nu-latn',{minimumFractionDigits:0,maximumFractionDigits:2})+' جنيه';
+const orderTypeAr=t=>({takeaway:'تيك أواي',dinein:'صالة',delivery:'دليفري'}[t]||t||'');
+
+function orderPrintData(orderId){
+  const o=db.getOrder(orderId);if(!o)throw new Error('الطلب غير موجود');
+  o.items=db.rows(`SELECT oi.*,p.category_id,c.name category_name,c.printer_route_id
+    FROM order_items oi LEFT JOIN products p ON p.id=oi.product_id LEFT JOIN categories c ON c.id=p.category_id
+    WHERE oi.order_id=? ORDER BY oi.created_at`,[orderId]);
+  return o;
+}
+function ticketCss(width=80){return `<style>@page{size:${Number(width)||80}mm auto;margin:0}*{box-sizing:border-box}body{margin:0;padding:4mm 3mm;font-family:Arial,Tahoma,sans-serif;color:#000;background:#fff;font-size:12px;direction:rtl}.ticket{width:100%}.center{text-align:center}.title{font-size:20px;font-weight:800;margin:2px 0}.sub{font-size:11px}.line{border-top:1px dashed #000;margin:7px 0}.meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px}.meta b{font-size:13px}.items{width:100%;border-collapse:collapse}.items th,.items td{padding:5px 2px;border-bottom:1px dotted #999;text-align:right}.items th:last-child,.items td:last-child{text-align:left}.qty{font-size:16px;font-weight:800}.grand{display:flex;justify-content:space-between;font-size:18px;font-weight:800;margin-top:8px}.note{border:1px solid #000;padding:6px;margin-top:7px;font-weight:700}.route{font-size:13px;font-weight:700;border:2px solid #000;padding:5px;margin:6px 0;text-align:center}</style>`}
+}
+function ticketHtml(kind,o,items,width=80,routeName=''){
+  const s=db.getSettings(), business=pEsc(s.business_name||'Geek POS'), when=new Date(o.created_at||Date.now()).toLocaleString('ar-EG-u-nu-latn');
+  const head=`<div class="center"><div class="title">${business}</div><div class="sub">${pEsc(s.business_address||'')}</div></div><div class="line"></div><div class="meta"><b>طلب #${o.order_no}</b><b>${orderTypeAr(o.order_type)}</b><span>${when}</span><span>${o.table_name?'طاولة: '+pEsc(o.table_name):o.customer_name?'العميل: '+pEsc(o.customer_name):''}</span></div>`;
+  const rows=(items||[]).map(i=>`<tr><td><span class="qty">${Number(i.qty)}×</span> ${pEsc(i.product_name)}${i.notes?`<div class="sub">ملاحظة: ${pEsc(i.notes)}</div>`:''}</td><td>${kind==='receipt'?pMoney(i.total||Number(i.qty)*Number(i.unit_price)):(pEsc(i.category_name||''))}</td></tr>`).join('');
+  const route=routeName?`<div class="route">${pEsc(routeName)}</div>`:'';
+  const notes=o.notes?`<div class="note">ملاحظات الطلب: ${pEsc(o.notes)}</div>`:'';
+  let tail='';
+  if(kind==='receipt')tail=`<div class="grand"><span>الإجمالي</span><span>${pMoney(o.total)}</span></div><div class="center sub" style="margin-top:10px">${pEsc(s.receipt_footer||'شكراً لزيارتكم')}</div>`;
+  else tail=`<div class="center" style="font-weight:800;margin-top:8px">${kind==='prep'?'بون تحضير':'بون تجميع'}</div>`;
+  return `<!doctype html><html dir="rtl"><head><meta charset="utf-8">${ticketCss(width)}</head><body><div class="ticket">${route}${head}<div class="line"></div><table class="items"><thead><tr><th>الصنف</th><th>${kind==='receipt'?'القيمة':'القسم'}</th></tr></thead><tbody>${rows}</tbody></table>${notes}${tail}</div></body></html>`;
+}
+function routeMatches(route,o){
+  const types=route.order_types||[];return !types.length||types.includes(o.order_type);
+}
+async function routeOrderPrint(orderId,stage='closed'){
+  const o=orderPrintData(orderId),routes=db.listPrinterRoutes(false),results=[];
+  const jobs=[];
+  if(stage!=='final'){
+    for(const r of routes.filter(x=>x.route_type==='prep')){
+      const its=o.items.filter(i=>i.printer_route_id===r.id);
+      if(its.length)jobs.push({r,kind:'prep',items:its});
+    }
+  }
+  if(stage!=='open'){
+    for(const r of routes.filter(x=>x.route_type==='assembly'&&routeMatches(x,o))){
+      const ids=r.category_ids||[],its=ids.length?o.items.filter(i=>ids.includes(i.category_id)):o.items;
+      if(its.length)jobs.push({r,kind:'assembly',items:its});
+    }
+    for(const r of routes.filter(x=>x.route_type==='receipt'&&routeMatches(x,o))){
+      const ids=r.category_ids||[],its=ids.length?o.items.filter(i=>ids.includes(i.category_id)):o.items;
+      if(its.length)jobs.push({r,kind:'receipt',items:its});
+    }
+  }
+  for(const j of jobs){
+    for(let copy=0;copy<Math.max(1,Number(j.r.copies||1));copy++){
+      const out=await printHtml(ticketHtml(j.kind,o,j.items,j.r.paper_width,j.r.name),j.r.printer_name);
+      results.push({route_id:j.r.id,route_name:j.r.name,kind:j.kind,...out});
+    }
+  }
+  return{success:results.every(x=>x.success),count:results.length,results};
 }
 
 app.whenReady().then(async()=>{
@@ -163,7 +218,18 @@ ipcMain.handle('settings:save',(_,data)=>{
 
 ipcMain.handle('sync:now',()=>sync.syncNow());
 ipcMain.handle('printer:list',async()=>win.webContents.getPrintersAsync());
+ipcMain.handle('printer:routes',(_,all=false)=>db.listPrinterRoutes(Boolean(all)));
+ipcMain.handle('printer:save-route',(_,d)=>db.savePrinterRoute(d));
+ipcMain.handle('printer:remove-route',(_,id)=>db.removePrinterRoute(id));
 ipcMain.handle('printer:print-html',(_,html,name)=>printHtml(html,name));
+ipcMain.handle('printer:route-order',(_,orderId,stage)=>routeOrderPrint(orderId,stage));
+ipcMain.handle('printer:preview',(_,kind,orderId)=>{
+  const o=orderId?orderPrintData(orderId):{order_no:125,order_type:'takeaway',total:150,created_at:new Date().toISOString(),items:[
+    {product_name:'صنف تجريبي',qty:1,unit_price:100,total:100,category_name:'قسم 1',notes:''},
+    {product_name:'صنف إضافي',qty:1,unit_price:50,total:50,category_name:'قسم 2',notes:'بدون إضافات'}
+  ]};
+  return ticketHtml(kind,o,o.items,80,kind==='prep'?'نقطة التحضير':kind==='assembly'?'تجميع تيك أواي':'فاتورة العميل');
+});
 
 ipcMain.handle('export:customers',async()=>{
   const rows=db.listCustomers('');
