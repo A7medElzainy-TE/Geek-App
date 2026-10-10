@@ -67,6 +67,11 @@ contextBridge.exposeInMainWorld('geek',{
   sync:()=>invoke('sync:now'),
   printers:{
     list:()=>invoke('printer:list'),
-    print:(html,name)=>invoke('printer:print-html',html,name)
+    routes:(all=false)=>invoke('printer:routes',all),
+    saveRoute:d=>invoke('printer:save-route',d),
+    removeRoute:id=>invoke('printer:remove-route',id),
+    print:(html,name)=>invoke('printer:print-html',html,name),
+    route:(orderId,stage)=>invoke('printer:route-order',orderId,stage),
+    preview:(kind,orderId=null)=>invoke('printer:preview',kind,orderId)
   }
 });
