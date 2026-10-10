@@ -76,6 +76,7 @@ const orderTypeAr=t=>({takeaway:'تيك أواي',dinein:'صالة',delivery:'د
 function orderPrintData(orderId){
   const o=db.getOrder(orderId);if(!o)throw new Error('الطلب غير موجود');
   o.cashier_name=o.user_id?db.scalar('SELECT name FROM users WHERE id=?',[o.user_id])||'':'';
+  o.payment_name=o.payment_method?db.scalar('SELECT name FROM payment_methods WHERE code=?',[o.payment_method])||o.payment_method:'';
   o.items=db.rows(`SELECT oi.*,p.category_id,c.name category_name,c.printer_route_id
     FROM order_items oi LEFT JOIN products p ON p.id=oi.product_id LEFT JOIN categories c ON c.id=p.category_id
     WHERE oi.order_id=? ORDER BY oi.created_at`,[orderId]);
@@ -92,18 +93,18 @@ async function ticketHtml(kind,o,items,width=80,routeName=''){
     const logoPath=path.join(__dirname,'../renderer/logo.jpg');
     const logoData=fs.existsSync(logoPath)?'data:image/jpeg;base64,'+fs.readFileSync(logoPath).toString('base64'):'';
     const qr=await QRCode.toDataURL(`Geek POS | Invoice ${o.order_no} | ${pNum(o.total)} EGP`,{margin:0,width:180,errorCorrectionLevel:'M'});
-    const rows=(items||[]).map(i=>`<tr><td>${pEsc(i.product_name)}${i.notes?`<div class="r-note">• ${pEsc(i.notes)}</div>`:''}</td><td>${Number(i.qty)}</td><td>${pNum(i.total||Number(i.qty)*Number(i.unit_price))}</td></tr>`).join('');
+    const rows=(items||[]).map(i=>`<tr><td>${pEsc(i.product_name)}</td><td>${Number(i.qty)}</td><td>${pNum(i.total||Number(i.qty)*Number(i.unit_price))}</td></tr>`).join('');
     const extra=[];
     if(Number(o.discount||0)>0)extra.push(`<div class="r-total-line"><span>الخصم</span><span>${pMoney(o.discount)}</span></div>`);
     if(Number(o.delivery_fee||0)>0)extra.push(`<div class="r-total-line"><span>التوصيل</span><span>${pMoney(o.delivery_fee)}</span></div>`);
     return `<!doctype html><html dir="rtl"><head><meta charset="utf-8">${ticketCss(width,'receipt')}</head><body><div class="receipt">
-      <div class="r-center">${logoData?`<img class="r-logo" src="${logoData}">`:``}<div class="r-name">${business}</div><div class="r-small">${pEsc(s.business_address||'')}</div><div class="r-small" dir="ltr">${pEsc(s.business_phone||'')}</div><div class="r-welcome">أهلاً بكم</div></div>
+      <div class="r-center">${logoData?`<img class="r-logo" src="${logoData}">`:``}<div class="r-name">${business}</div><div class="r-small">${pEsc(s.business_branch||'')}</div><div class="r-small">${pEsc(s.business_address||'')}</div><div class="r-small" dir="ltr">${pEsc(s.business_phone||'')}</div><div class="r-small">${s.tax_number?'الرقم الضريبي: '+pEsc(s.tax_number):''}</div><div class="r-welcome">أهلاً بكم</div></div>
       <div class="dash"></div>
       <div class="r-meta"><span>فاتورة #${o.order_no}</span><span>${date} ${time}</span><span>النوع: ${orderTypeAr(o.order_type)}</span><span>${o.table_name?'طاولة: '+pEsc(o.table_name):''}</span><span>الكاشير: ${pEsc(o.cashier_name||'')}</span><span></span></div>
       <table class="r-table"><thead><tr><th>الصنف</th><th>كمية</th><th>القيمة</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="r-totals"><div class="r-total-line"><span>المجموع</span><span>${pMoney(o.subtotal)}</span></div>${extra.join('')}</div>
       <div class="r-total-line r-grand"><span>الإجمالي</span><span>${pMoney(o.total)}</span></div>
-      <div class="r-paid"><span>نقدي</span><span>${pMoney(o.paid||o.total)}</span></div>
+      <div class="r-paid"><span>${pEsc(o.payment_name||'نقدي')}</span><span>${pMoney(o.paid||o.total)}</span></div>
       <div class="dash"></div><div class="r-center r-footer">${pEsc(s.receipt_footer||'شكراً لزيارتكم — نتشرف بخدمتكم')}</div><img class="qr" src="${qr}">
     </div></body></html>`;
   }
