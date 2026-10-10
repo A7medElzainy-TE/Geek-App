@@ -3,7 +3,7 @@ const S={boot:null,user:null,page:'dashboard',cats:[],products:[],deliveryTab:'o
 const AR={new:'جديد',open:'مفتوح',kitchen:'في المطبخ',ready:'جاهز',with_driver:'مع الطيار',awaiting_settlement:'بانتظار التسوية',closed:'مغلق',returned:'مرتجع'};
 const TYPE={takeaway:'تيك أواي',dinein:'صالة',delivery:'دليفري'};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const money=v=>Number(v||0).toLocaleString('ar-EG-u-nu-latn',{minimumFractionDigits:0,maximumFractionDigits:2})+' جنيه';
+const money=v=>Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' ج.م';
 
 function toast(m,bad=false){const t=$('#toast');t.textContent=m;t.className='toast show'+(bad?' error':'');setTimeout(()=>t.className='toast',3000)}
 function title(t){$('#title').textContent=t}
