@@ -11,8 +11,9 @@ class SyncService {
     if(error)throw error;
     return client;
   }
-  mapEntity(row,ctx){
+  mapEntity(row,ctx,entity){
     const copy={...row};delete copy.sync_status;
+    if(entity==='categories')delete copy.printer_route_id;
     copy.business_id=ctx.business_id;copy.branch_id=ctx.branch_id||null;
     return copy;
   }
@@ -42,7 +43,7 @@ class SyncService {
           }
           const row=this.db.one(`SELECT * FROM ${item.entity} WHERE id=?`,[item.entity_id]);
           if(!row){this.db.run('DELETE FROM sync_queue WHERE id=?',[item.id]);continue}
-          const payload=this.mapEntity(row,profile);
+          const payload=this.mapEntity(row,profile,item.entity);
           const {error}=await client.from(table).upsert(payload,{onConflict:'id'});
           if(error)throw error;
           this.db.run(`UPDATE ${item.entity} SET sync_status='synced' WHERE id=?`,[item.entity_id]);
