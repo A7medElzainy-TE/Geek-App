@@ -72,6 +72,13 @@ class Database {
         id TEXT PRIMARY KEY, name TEXT NOT NULL, code TEXT UNIQUE NOT NULL, active INTEGER DEFAULT 1,
         sort_order INTEGER DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sync_status TEXT DEFAULT 'pending'
       );
+      CREATE TABLE IF NOT EXISTS printer_routes (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, printer_name TEXT NOT NULL, route_type TEXT NOT NULL,
+        order_types_json TEXT NOT NULL DEFAULT '[]', category_ids_json TEXT NOT NULL DEFAULT '[]',
+        paper_width INTEGER NOT NULL DEFAULT 80, copies INTEGER NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
 
       CREATE TABLE IF NOT EXISTS shifts (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL, opened_at TEXT NOT NULL, opening_cash REAL DEFAULT 0,
@@ -115,7 +122,9 @@ class Database {
     // Existing installations may have an older orders table without table_id.
     // Add the column first, then create indexes that depend on it.
     this.ensureColumn('orders','table_id','TEXT');
+    this.ensureColumn('categories','printer_route_id','TEXT');
     this.run('CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_id)');
+    this.run('CREATE INDEX IF NOT EXISTS idx_categories_printer_route ON categories(printer_route_id)');
     this.seedDefaults();
   }
 
@@ -187,7 +196,7 @@ class Database {
   upsertCategory(data){
     if(!String(data.name||'').trim())throw new Error('اكتب اسم القسم');
     const id=data.id||this.id(),now=this.now(),old=data.id?this.one('SELECT * FROM categories WHERE id=?',[data.id]):null;
-    this.run('INSERT INTO categories(id,name,sort_order,active,created_at,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,sort_order=excluded.sort_order,active=excluded.active,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,data.name.trim(),Number(data.sort_order??old?.sort_order??0),data.active===false?0:1,old?.created_at||now,now]);
+    this.run('INSERT INTO categories(id,name,sort_order,active,printer_route_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,sort_order=excluded.sort_order,active=excluded.active,printer_route_id=excluded.printer_route_id,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,data.name.trim(),Number(data.sort_order??old?.sort_order??0),data.active===false?0:1,data.printer_route_id||null,old?.created_at||now,now]);
     this.queue('categories',id);this.persist();return id;
   }
   removeCategory(id){this.run("UPDATE categories SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('categories',id);this.persist();return true}
@@ -242,6 +251,17 @@ class Database {
   saveDiningTable(d){if(!String(d.name||'').trim())throw new Error('اكتب اسم الطاولة');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM dining_tables WHERE id=?',[d.id]):null;this.run('INSERT INTO dining_tables(id,name,area,seats,sort_order,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,area=excluded.area,seats=excluded.seats,sort_order=excluded.sort_order,active=excluded.active,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,d.name.trim(),d.area||'الصالة',Number(d.seats||4),Number(d.sort_order||0),d.active===false?0:1,old?.created_at||now,now]);this.queue('dining_tables',id);this.persist();return id}
   removeDiningTable(id){const occupied=this.one("SELECT id FROM orders WHERE table_id=? AND order_type='dinein' AND status NOT IN ('closed','returned')",[id]);if(occupied)throw new Error('لا يمكن إيقاف طاولة عليها طلب مفتوح');this.run("UPDATE dining_tables SET active=0,updated_at=?,sync_status='pending' WHERE id=?",[this.now(),id]);this.queue('dining_tables',id);this.persist();return true}
   currentTableOrder(tableId){const o=this.one("SELECT id FROM orders WHERE table_id=? AND order_type='dinein' AND status NOT IN ('closed','returned') ORDER BY created_at DESC LIMIT 1",[tableId]);return o?this.getOrder(o.id):null}
+
+  listPrinterRoutes(includeInactive=false){return this.rows(`SELECT * FROM printer_routes ${includeInactive?'':'WHERE active=1'} ORDER BY sort_order,name`).map(r=>({...r,order_types:JSON.parse(r.order_types_json||'[]'),category_ids:JSON.parse(r.category_ids_json||'[]')}))}
+  savePrinterRoute(d){
+    if(!String(d.name||'').trim())throw new Error('اكتب اسم نقطة الطباعة');
+    if(!String(d.printer_name||'').trim())throw new Error('اختر الطابعة الفعلية');
+    if(!['prep','assembly','receipt'].includes(d.route_type))throw new Error('نوع نقطة الطباعة غير صحيح');
+    const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM printer_routes WHERE id=?',[d.id]):null;
+    this.run('INSERT INTO printer_routes(id,name,printer_name,route_type,order_types_json,category_ids_json,paper_width,copies,active,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,printer_name=excluded.printer_name,route_type=excluded.route_type,order_types_json=excluded.order_types_json,category_ids_json=excluded.category_ids_json,paper_width=excluded.paper_width,copies=excluded.copies,active=excluded.active,sort_order=excluded.sort_order,updated_at=excluded.updated_at',[id,d.name.trim(),d.printer_name,d.route_type,JSON.stringify(d.order_types||[]),JSON.stringify(d.category_ids||[]),Number(d.paper_width||80),Math.max(1,Number(d.copies||1)),d.active===false?0:1,Number(d.sort_order||0),old?.created_at||now,now]);
+    this.persist();return id;
+  }
+  removePrinterRoute(id){this.run('UPDATE printer_routes SET active=0,updated_at=? WHERE id=?',[this.now(),id]);this.run('UPDATE categories SET printer_route_id=NULL WHERE printer_route_id=?',[id]);this.persist();return true}
 
   listPaymentMethods(includeInactive=false){return this.rows(`SELECT * FROM payment_methods ${includeInactive?'':'WHERE active=1'} ORDER BY sort_order,name`)}
   savePaymentMethod(d){if(!String(d.name||'').trim()||!String(d.code||'').trim())throw new Error('الاسم والكود مطلوبان');const id=d.id||this.id(),now=this.now(),old=d.id?this.one('SELECT * FROM payment_methods WHERE id=?',[d.id]):null;this.run('INSERT INTO payment_methods(id,name,code,active,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,code=excluded.code,active=excluded.active,sort_order=excluded.sort_order,updated_at=excluded.updated_at,sync_status=\'pending\'',[id,d.name.trim(),d.code.trim(),d.active===false?0:1,Number(d.sort_order||0),old?.created_at||now,now]);this.queue('payment_methods',id);this.persist();return id}
